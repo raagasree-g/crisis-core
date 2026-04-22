@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useMemo, useState } from "react";
 
 const ORG_TYPES = [
   "Hotel",
@@ -17,128 +17,88 @@ const ORG_TYPES = [
   "Others",
 ];
 
-const countries = [
-  { name: "India", code: "+91" },
-  { name: "USA", code: "+1" },
-  { name: "UK", code: "+44" },
-  { name: "Australia", code: "+61" },
-  { name: "Canada", code: "+1" },
-  { name: "Germany", code: "+49" },
-  { name: "France", code: "+33" },
-  { name: "Japan", code: "+81" },
-  { name: "China", code: "+86" },
-];
+function roleLabel(role) {
+  if (role === "user") return "User";
+  if (role === "responder") return "Responder";
+  if (role === "admin") return "Admin";
+  return "";
+}
 
 function Login({ setRole }) {
-  const [userInfo, setUserInfo] = useState({
-    name: localStorage.getItem("userName") || "",
-  });
-  const [countryCode, setCountryCode] = useState("+91");
+  const storedName = localStorage.getItem("userName") || "";
+  const storedPhone = localStorage.getItem("phone") || "";
+  const storedOrg = localStorage.getItem("organizationType") || "";
+
+  const [name, setName] = useState(storedName);
   const [phone, setPhone] = useState("");
-  const [phoneError, setPhoneError] = useState("");
-  const [userInfoDone, setUserInfoDone] = useState(false);
+  const [countryCode, setCountryCode] = useState("+91");
 
-  const [selectedOrgType, setSelectedOrgType] = useState(null);
-  const [orgDetailsCompleted, setOrgDetailsCompleted] = useState(false);
+  const [selectedOrgType, setSelectedOrgType] = useState(storedOrg);
+  const [customOrg, setCustomOrg] = useState("");
   const [selectedRole, setSelectedRole] = useState(null);
-
-  const [orgDetails, setOrgDetails] = useState({
-    name: "",
-    location: "",
-    contact: "",
-    capacity: "",
-    extra: "",
-  });
 
   const [room, setRoom] = useState("");
   const [staffId, setStaffId] = useState("");
   const [department, setDepartment] = useState("Security");
   const [adminCode, setAdminCode] = useState("");
+
   const [error, setError] = useState("");
 
-  const userName = localStorage.getItem("userName") || userInfo.name;
+  const userInfoDone = Boolean(name.trim()) && Boolean(storedPhone);
 
-  const getExtraLabel = () => {
-    if (selectedOrgType === "Hotel") return "Number of Floors";
-    if (selectedOrgType === "Hospital") return "Number of Departments";
-    if (selectedOrgType === "Event") return "Event Name";
-    if (selectedOrgType === "Others") return "Describe Organization";
-    return "";
-  };
+  const activeUserName = localStorage.getItem("userName") || name.trim();
+  const activeOrg = selectedOrgType || localStorage.getItem("organizationType") || "Organization";
+  const bannerRole = selectedRole ? roleLabel(selectedRole) : "Role";
 
   function validatePhone() {
     const normalized = phone.trim();
 
     if (!normalized) {
-      setPhoneError("Phone number is required");
+      setError("Phone number is required");
       return false;
     }
 
     if (normalized.length < 8) {
-      setPhoneError("Phone number too short");
+      setError("Phone number too short");
       return false;
     }
 
     if (normalized.length > 15) {
-      setPhoneError("Phone number too long (max 15 digits)");
+      setError("Phone number too long");
       return false;
     }
 
-    setPhoneError("");
+    setError("");
     return true;
   }
 
   const handleContinueUserInfo = () => {
-    const cleanName = userInfo.name.trim();
+    const cleanName = name.trim();
 
     if (!cleanName) {
-      setError("Please enter name.");
+      setError("Name is required");
       return;
     }
 
-    if (!validatePhone()) {
-      return;
-    }
+    if (!validatePhone()) return;
 
     const fullPhone = `${countryCode}${phone.trim()}`;
 
     localStorage.setItem("userName", cleanName);
     localStorage.setItem("phone", fullPhone);
-    setUserInfoDone(true);
     setError("");
   };
 
-  const handleOrgSelect = (orgType) => {
-    setSelectedOrgType(orgType);
-    setOrgDetailsCompleted(false);
-    setSelectedRole(null);
-    setError("");
-  };
+  const handleContinueOrg = () => {
+    const orgType = selectedOrgType === "Others" ? customOrg.trim() : selectedOrgType;
 
-  const handleContinueOrgDetails = () => {
-    const details = {
-      name: orgDetails.name.trim(),
-      location: orgDetails.location.trim(),
-      contact: orgDetails.contact.trim(),
-      capacity: orgDetails.capacity.trim(),
-      extra: orgDetails.extra.trim(),
-    };
-
-    if (!details.name || !details.location || !details.contact || !details.capacity) {
-      setError("Please fill all required organization details.");
+    if (!orgType) {
+      setError("Please select organization");
       return;
     }
 
-    localStorage.setItem("organizationType", selectedOrgType);
-    localStorage.setItem(
-      "organizationDetails",
-      JSON.stringify({
-        ...details,
-        organizationType: selectedOrgType,
-      }),
-    );
-
-    setOrgDetailsCompleted(true);
+    localStorage.setItem("organizationType", orgType);
+    setSelectedOrgType(orgType);
     setError("");
   };
 
@@ -146,7 +106,7 @@ function Login({ setRole }) {
     const cleanRoom = room.trim();
 
     if (!cleanRoom) {
-      setError("Please enter room number.");
+      setError("Room number is required");
       return;
     }
 
@@ -158,8 +118,8 @@ function Login({ setRole }) {
   const handleResponderLogin = () => {
     const cleanStaffId = staffId.trim();
 
-    if (!cleanStaffId || !department) {
-      setError("Please enter Staff ID and department.");
+    if (!cleanStaffId) {
+      setError("Staff ID is required");
       return;
     }
 
@@ -171,13 +131,67 @@ function Login({ setRole }) {
 
   const handleAdminLogin = () => {
     if (adminCode !== "1234") {
-      setError("Invalid admin code.");
+      setError("Invalid admin code");
       return;
     }
 
     localStorage.setItem("role", "admin");
     setRole("admin");
   };
+
+  const loginForm = useMemo(() => {
+    if (selectedRole === "user") {
+      return (
+        <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
+          <h2 style={{ margin: 0, textAlign: "center" }}>User Login</h2>
+          <p style={{ margin: 0 }}><strong>Welcome, {activeUserName}</strong></p>
+          <label style={{ display: "grid", gap: 6 }}>
+            Room Number
+            <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="203" />
+          </label>
+          <button onClick={handleUserLogin} style={{ padding: "10px 14px" }}>Enter System</button>
+        </div>
+      );
+    }
+
+    if (selectedRole === "responder") {
+      return (
+        <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
+          <h2 style={{ margin: 0, textAlign: "center" }}>Responder Login</h2>
+          <p style={{ margin: 0 }}><strong>Welcome, {activeUserName}</strong></p>
+          <label style={{ display: "grid", gap: 6 }}>
+            Staff ID
+            <input value={staffId} onChange={(e) => setStaffId(e.target.value)} placeholder="staff_1" />
+          </label>
+          <label style={{ display: "grid", gap: 6 }}>
+            Department
+            <select value={department} onChange={(e) => setDepartment(e.target.value)}>
+              <option value="Security">Security</option>
+              <option value="Medical">Medical</option>
+            </select>
+          </label>
+          <button onClick={handleResponderLogin} style={{ padding: "10px 14px" }}>Enter System</button>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
+        <h2 style={{ margin: 0, textAlign: "center" }}>Admin Login</h2>
+        <p style={{ margin: 0 }}><strong>Welcome, {activeUserName}</strong></p>
+        <label style={{ display: "grid", gap: 6 }}>
+          Admin Code
+          <input
+            type="password"
+            value={adminCode}
+            onChange={(e) => setAdminCode(e.target.value)}
+            placeholder="Enter code"
+          />
+        </label>
+        <button onClick={handleAdminLogin} style={{ padding: "10px 14px" }}>Enter System</button>
+      </div>
+    );
+  }, [selectedRole, activeUserName, room, staffId, department, adminCode]);
 
   return (
     <main className="layout" style={{ gridTemplateColumns: "1fr", maxWidth: 560, placeItems: "center" }}>
@@ -189,225 +203,140 @@ function Login({ setRole }) {
             <h2 style={{ margin: 0, textAlign: "center" }}>Enter Your Details</h2>
             <label style={{ display: "grid", gap: 6 }}>
               Name
-              <input
-                value={userInfo.name}
-                onChange={(e) => setUserInfo((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter your name"
-              />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" />
             </label>
+
             <label style={{ display: "grid", gap: 6 }}>
               Phone Number
               <div style={{ display: "grid", gridTemplateColumns: "170px 1fr", gap: 8 }}>
-                <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
-                  {countries.map((c, index) => (
-                    <option key={`${c.code}-${c.name}-${index}`} value={c.code}>
-                      {c.name} ({c.code})
-                    </option>
-                  ))}
+                <select
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                >
+                  <option value="+91">India (+91)</option>
+                  <option value="+1">USA (+1)</option>
+                  <option value="+44">UK (+44)</option>
+                  <option value="+61">Australia (+61)</option>
                 </select>
+
                 <input
                   type="tel"
-                  placeholder="Enter phone number"
                   value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value.replace(/\D/g, "").trim());
-                    if (phoneError) setPhoneError("");
-                  }}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Enter phone number"
                 />
               </div>
             </label>
-            {phoneError && (
-              <p style={{ color: "red", margin: 0 }}>{phoneError}</p>
-            )}
+
             <button onClick={handleContinueUserInfo} style={{ padding: "10px 14px" }}>
               Continue
             </button>
           </div>
-        ) : selectedOrgType === null ? (
+        ) : !selectedOrgType ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-            <p>Welcome, {userName}</p>
-            <p>Step: Org</p>
+            <p>Welcome, {activeUserName}</p>
             <h2 style={{ margin: 0 }}>Select Organization Type</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-              {ORG_TYPES.map((org) => (
-                <button
-                  key={org}
-                  onClick={() => handleOrgSelect(org)}
-                  style={{
-                    padding: "10px 12px",
-                    border: selectedOrgType === org ? "2px solid #0a58ca" : "1px solid #d0d7e2",
-                  }}
-                >
-                  {org}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => {
-                setUserInfoDone(false);
+
+            <select
+              value={selectedOrgType || ""}
+              onChange={(e) => {
+                setSelectedOrgType(e.target.value);
                 setError("");
               }}
-              style={{ padding: "10px 14px" }}
             >
-              {"<- Back to Your Details"}
-            </button>
-          </div>
-        ) : !orgDetailsCompleted ? (
-          <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
-            <p style={{ textAlign: "center" }}>Welcome, {userName}</p>
-            <p style={{ textAlign: "center" }}>Step: Details</p>
-            <h2 style={{ margin: 0, textAlign: "center" }}>Enter Organization Details</h2>
-            <label style={{ display: "grid", gap: 6 }}>
-              Organization Name
-              <input
-                value={orgDetails.name}
-                onChange={(e) => setOrgDetails((prev) => ({ ...prev, name: e.target.value }))}
-                placeholder="Enter organization name"
-              />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              Location (City / Area)
-              <input
-                value={orgDetails.location}
-                onChange={(e) => setOrgDetails((prev) => ({ ...prev, location: e.target.value }))}
-                placeholder="Enter location"
-              />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              Contact Number
-              <input
-                value={orgDetails.contact}
-                onChange={(e) => setOrgDetails((prev) => ({ ...prev, contact: e.target.value }))}
-                placeholder="Enter contact number"
-              />
-            </label>
-            <label style={{ display: "grid", gap: 6 }}>
-              Capacity (number of people)
-              <input
-                type="number"
-                value={orgDetails.capacity}
-                onChange={(e) => setOrgDetails((prev) => ({ ...prev, capacity: e.target.value }))}
-                placeholder="Enter capacity"
-              />
-            </label>
+              <option value="">Select organization</option>
+              {ORG_TYPES.map((org) => (
+                <option key={org} value={org}>{org}</option>
+              ))}
+            </select>
 
-            {getExtraLabel() ? (
-              <label style={{ display: "grid", gap: 6 }}>
-                {getExtraLabel()}
-                <input
-                  value={orgDetails.extra}
-                  onChange={(e) => setOrgDetails((prev) => ({ ...prev, extra: e.target.value }))}
-                  placeholder={`Enter ${getExtraLabel().toLowerCase()}`}
-                />
-              </label>
+            {selectedOrgType === "Others" ? (
+              <input
+                placeholder="What is your organization?"
+                value={customOrg}
+                onChange={(e) => setCustomOrg(e.target.value)}
+              />
             ) : null}
 
-            <button onClick={handleContinueOrgDetails} style={{ padding: "10px 14px" }}>
+            <button onClick={handleContinueOrg} style={{ padding: "10px 14px" }}>
               Continue
             </button>
+
             <button
               onClick={() => {
-                setSelectedOrgType(null);
-                setOrgDetailsCompleted(false);
-                setSelectedRole(null);
+                localStorage.removeItem("userName");
+                localStorage.removeItem("phone");
+                setName("");
+                setPhone("");
+                setSelectedOrgType("");
                 setError("");
               }}
               style={{ padding: "10px 14px" }}
             >
-              {"<- Back to Organization"}
+              {"<- Change User Details"}
             </button>
           </div>
-        ) : selectedRole === null ? (
+        ) : !selectedRole ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-            <p>Welcome, {userName}</p>
-            <p>Step: Role</p>
+            <p>
+              {localStorage.getItem("organizationType") || selectedOrgType} • Role • {activeUserName}
+            </p>
             <h2 style={{ margin: 0 }}>Select Your Role</h2>
+
             <button onClick={() => { setSelectedRole("user"); setError(""); }} style={{ padding: "10px 14px" }}>
-              Login as User
+              User
             </button>
             <button onClick={() => { setSelectedRole("responder"); setError(""); }} style={{ padding: "10px 14px" }}>
-              Login as Responder
+              Responder
             </button>
             <button onClick={() => { setSelectedRole("admin"); setError(""); }} style={{ padding: "10px 14px" }}>
-              Login as Admin
+              Admin
             </button>
+
             <button
               onClick={() => {
-                setOrgDetailsCompleted(false);
+                localStorage.removeItem("organizationType");
+                setSelectedOrgType("");
                 setSelectedRole(null);
                 setError("");
               }}
               style={{ padding: "10px 14px" }}
             >
-              {"<- Back to Organization Details"}
+              {"<- Change Organization"}
             </button>
           </div>
         ) : (
-          <>
-            {selectedRole === "user" ? (
-              <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
-                <h2 style={{ margin: 0, textAlign: "center" }}>User Login</h2>
-                <p style={{ margin: 0 }}><strong>Welcome, {userName}</strong></p>
-                <label style={{ display: "grid", gap: 6 }}>
-                  Name (readonly)
-                  <input value={userName} readOnly />
-                </label>
-                <label style={{ display: "grid", gap: 6 }}>
-                  Room Number
-                  <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="203" />
-                </label>
-                <button onClick={handleUserLogin} style={{ padding: "10px 14px" }}>Login as Guest</button>
-                <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
-                  {"<- Back to Role Selection"}
-                </button>
-              </div>
-            ) : null}
+          <div style={{ display: "grid", gap: 10 }}>
+            <p>
+              {(localStorage.getItem("organizationType") || selectedOrgType)} • {roleLabel(selectedRole)} • {activeUserName}
+            </p>
+            {loginForm}
 
-            {selectedRole === "responder" ? (
-              <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
-                <h2 style={{ margin: 0, textAlign: "center" }}>Responder Login</h2>
-                <p style={{ margin: 0 }}><strong>Welcome, {userName}</strong></p>
-                <label style={{ display: "grid", gap: 6 }}>
-                  Staff ID
-                  <input value={staffId} onChange={(e) => setStaffId(e.target.value)} placeholder="staff_1" />
-                </label>
-                <label style={{ display: "grid", gap: 6 }}>
-                  Department
-                  <select value={department} onChange={(e) => setDepartment(e.target.value)}>
-                    <option value="Security">Security</option>
-                    <option value="Medical">Medical</option>
-                  </select>
-                </label>
-                <button onClick={handleResponderLogin} style={{ padding: "10px 14px" }}>Login as Responder</button>
-                <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
-                  {"<- Back to Role Selection"}
-                </button>
-              </div>
-            ) : null}
+            <button
+              onClick={() => {
+                setSelectedRole(null);
+                setError("");
+              }}
+              style={{ padding: "10px 14px" }}
+            >
+              Change Role
+            </button>
 
-            {selectedRole === "admin" ? (
-              <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
-                <h2 style={{ margin: 0, textAlign: "center" }}>Admin Login</h2>
-                <p style={{ margin: 0 }}><strong>Welcome, {userName}</strong></p>
-                <label style={{ display: "grid", gap: 6 }}>
-                  Admin Code
-                  <input
-                    type="password"
-                    value={adminCode}
-                    onChange={(e) => setAdminCode(e.target.value)}
-                    placeholder="Enter code"
-                  />
-                </label>
-                <button onClick={handleAdminLogin} style={{ padding: "10px 14px" }}>Login as Admin</button>
-                <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
-                  {"<- Back to Role Selection"}
-                </button>
-              </div>
-            ) : null}
-          </>
+            <button
+              onClick={() => {
+                localStorage.removeItem("organizationType");
+                setSelectedOrgType("");
+                setSelectedRole(null);
+                setError("");
+              }}
+              style={{ padding: "10px 14px" }}
+            >
+              Change Organization
+            </button>
+          </div>
         )}
 
-        {error ? <p className="error" style={{ marginTop: 12 }}>{error}</p> : null}
+        {error && <p style={{ color: "red" }}>{error}</p>}
       </section>
     </main>
   );
