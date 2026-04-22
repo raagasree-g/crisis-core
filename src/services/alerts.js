@@ -24,31 +24,45 @@ export function getNextStatusLabel(status) {
 }
 
 export async function createAlert({ type, room, note }) {
-  return addDoc(collection(db, ALERTS), {
-    type,
-    room,
-    note: note || "",
-    status: "new",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  try {
+    return await addDoc(collection(db, ALERTS), {
+      type,
+      room,
+      note: note || "",
+      status: "new",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("createAlert failed", error);
+    throw error;
+  }
 }
 
 export function subscribeAlerts(onData, onError) {
-  const alertsQuery = query(collection(db, ALERTS), orderBy("createdAt", "desc"));
+  try {
+    const alertsQuery = query(collection(db, ALERTS), orderBy("createdAt", "desc"));
 
-  return onSnapshot(
-    alertsQuery,
-    (snapshot) => {
-      const alertList = snapshot.docs.map((alertDoc) => ({ id: alertDoc.id, ...alertDoc.data() }));
-      onData(alertList);
-    },
-    onError,
-  );
+    return onSnapshot(
+      alertsQuery,
+      (snapshot) => {
+        const alertList = snapshot.docs.map((alertDoc) => ({ id: alertDoc.id, ...alertDoc.data() }));
+        onData(alertList);
+      },
+      (error) => {
+        console.error("subscribeAlerts failed", error);
+        onError(error);
+      },
+    );
+  } catch (error) {
+    console.error("subscribeAlerts setup failed", error);
+    onError(error);
+    return () => {};
+  }
 }
 
-export async function updateAlertStatus(alertId, currentStatus) {
-  const nextStatus = NEXT_STATUS[currentStatus];
+export async function updateAlertStatus(alertItem) {
+  const nextStatus = NEXT_STATUS[alertItem.status];
 
   if (!nextStatus) {
     throw new Error("No next status available");
@@ -61,7 +75,21 @@ export async function updateAlertStatus(alertId, currentStatus) {
 
   if (nextStatus === "resolved") {
     payload.resolvedAt = serverTimestamp();
+    console.log("Send to blockchain:", {
+      id: alertItem.id,
+      type: alertItem.type,
+      room: alertItem.room,
+      note: alertItem.note || "",
+      createdAt: alertItem.createdAt || null,
+      resolvedAt: "serverTimestamp()",
+      status: nextStatus,
+    });
   }
 
-  await updateDoc(doc(db, ALERTS, alertId), payload);
+  try {
+    await updateDoc(doc(db, ALERTS, alertItem.id), payload);
+  } catch (error) {
+    console.error("updateAlertStatus failed", error);
+    throw error;
+  }
 }

@@ -4,14 +4,32 @@ import { createAlert, getNextStatusLabel, subscribeAlerts, updateAlertStatus } f
 
 const ALERT_TYPES = ["fire", "medical", "security", "other"];
 
-function formatDate(value) {
-  if (!value) return "Just now";
+function getDate(value) {
+  if (!value) return null;
 
-  const date = typeof value?.toDate === "function"
-    ? value.toDate()
-    : new Date(value.seconds ? value.seconds * 1000 : value);
+  if (typeof value?.toDate === "function") {
+    return value.toDate();
+  }
 
-  if (Number.isNaN(date.getTime())) return "Just now";
+  if (value?.seconds) {
+    return new Date(value.seconds * 1000);
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function formatCreatedAt(value) {
+  const date = getDate(value);
+  if (!date) return "Just now";
+
+  const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds < 15) return "Just now";
+  if (diffSeconds < 60) return `${diffSeconds} sec ago`;
+
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} min ago`;
 
   return new Intl.DateTimeFormat("en-IN", {
     hour: "2-digit",
@@ -19,6 +37,16 @@ function formatDate(value) {
     day: "2-digit",
     month: "short",
   }).format(date);
+}
+
+function getResponseTimeSeconds(createdAt, resolvedAt) {
+  const created = getDate(createdAt);
+  const resolved = getDate(resolvedAt);
+
+  if (!created || !resolved) return null;
+
+  const seconds = Math.max(0, Math.round((resolved.getTime() - created.getTime()) / 1000));
+  return seconds;
 }
 
 function App() {
@@ -84,7 +112,9 @@ function App() {
     try {
       await createAlert({ type, room: cleanRoom, note: cleanNote });
       lastSubmitRef.current = { signature, at: now };
+      setRoom("");
       setNote("");
+      setType("fire");
     } catch (error) {
       console.error(error);
       setErrorMessage("Could not send alert. Please retry.");
@@ -93,12 +123,14 @@ function App() {
     }
   };
 
-  const handleStatusUpdate = async (alertId, currentStatus) => {
-    setUpdatingId(alertId);
+  const handleStatusUpdate = async (alertItem) => {
+    if (updatingId) return;
+
+    setUpdatingId(alertItem.id);
     setErrorMessage("");
 
     try {
-      await updateAlertStatus(alertId, currentStatus);
+      await updateAlertStatus(alertItem);
     } catch (error) {
       console.error(error);
       setErrorMessage("Failed to update status. Please retry.");
@@ -116,7 +148,11 @@ function App() {
         <form className="sos-form" onSubmit={handleSendSos}>
           <label>
             Alert type
-            <select value={type} onChange={(event) => setType(event.target.value)}>
+            <select
+              value={type}
+              onChange={(event) => setType(event.target.value)}
+              disabled={sending || Boolean(updatingId)}
+            >
               {ALERT_TYPES.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
@@ -131,6 +167,7 @@ function App() {
               placeholder="203"
               maxLength={10}
               required
+              disabled={sending || Boolean(updatingId)}
             />
           </label>
 
@@ -141,10 +178,11 @@ function App() {
               onChange={(event) => setNote(event.target.value)}
               placeholder="Smoke near corridor"
               maxLength={140}
+              disabled={sending || Boolean(updatingId)}
             />
           </label>
 
-          <button type="submit" disabled={sending}>
+          <button type="submit" disabled={sending || Boolean(updatingId)}>
             {sending ? "Sending..." : "Send SOS"}
           </button>
         </form>
@@ -167,23 +205,25 @@ function App() {
             {alerts.map((alertItem) => {
               const nextLabel = getNextStatusLabel(alertItem.status);
               const isUpdating = updatingId === alertItem.id;
+              const responseSeconds = getResponseTimeSeconds(alertItem.createdAt, alertItem.resolvedAt);
 
               return (
                 <li key={alertItem.id} className="alert-item">
                   <div>
-                    <p className="title">
-                      Room {alertItem.room} - {alertItem.type}
-                    </p>
+                    <p className="title">{alertItem.type} | Room {alertItem.room}</p>
                     <p className={`status status-${alertItem.status}`}>{alertItem.status}</p>
-                    <p className="meta">Created: {formatDate(alertItem.createdAt)}</p>
+                    <p className="meta">Created: {formatCreatedAt(alertItem.createdAt)}</p>
                     {alertItem.note ? <p className="meta">Note: {alertItem.note}</p> : null}
+                    {responseSeconds !== null ? (
+                      <p className="meta">Response Time: {responseSeconds} seconds</p>
+                    ) : null}
                   </div>
 
                   {nextLabel ? (
                     <button
                       className="status-btn"
-                      onClick={() => handleStatusUpdate(alertItem.id, alertItem.status)}
-                      disabled={isUpdating}
+                      onClick={() => handleStatusUpdate(alertItem)}
+                      disabled={Boolean(updatingId) || sending}
                     >
                       {isUpdating ? "Updating..." : nextLabel}
                     </button>
