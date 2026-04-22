@@ -5,11 +5,15 @@ service cloud.firestore {
       return t in ['fire', 'medical', 'security', 'other'];
     }
 
+    function isStatus(s) {
+      return s in ['NEW', 'IN_PROGRESS', 'RESOLVED'];
+    }
+
     match /alerts/{alertId} {
       allow read: if true;
 
       allow create: if request.resource.data.keys().hasOnly([
-          'type', 'room', 'note', 'status', 'createdAt', 'updatedAt'
+          'type', 'room', 'note', 'status', 'createdAt', 'acceptedAt', 'resolvedAt', 'assignedTo', 'createdBy'
         ])
         && isAllowedType(request.resource.data.type)
         && request.resource.data.room is string
@@ -17,25 +21,39 @@ service cloud.firestore {
         && request.resource.data.room.size() <= 10
         && request.resource.data.note is string
         && request.resource.data.note.size() <= 140
-        && request.resource.data.status == 'new';
+        && request.resource.data.status == 'NEW'
+        && request.resource.data.assignedTo == null
+        && request.resource.data.acceptedAt == null
+        && request.resource.data.resolvedAt == null
+        && request.resource.data.createdBy is string;
 
-      allow update: if resource.data.status in ['new', 'in_progress']
+      allow update: if isStatus(resource.data.status)
+        && isStatus(request.resource.data.status)
         && request.resource.data.type == resource.data.type
         && request.resource.data.room == resource.data.room
         && request.resource.data.note == resource.data.note
         && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy
         && (
-          (resource.data.status == 'new'
-            && request.resource.data.status == 'in_progress'
+          (
+            resource.data.status == 'NEW'
+            && request.resource.data.status == 'IN_PROGRESS'
+            && request.resource.data.assignedTo is string
+            && request.resource.data.acceptedAt != null
+            && request.resource.data.resolvedAt == resource.data.resolvedAt
             && request.resource.data.keys().hasOnly([
-              'type', 'room', 'note', 'status', 'createdAt', 'updatedAt'
+              'type', 'room', 'note', 'status', 'createdAt', 'acceptedAt', 'resolvedAt', 'assignedTo', 'createdBy'
             ])
           )
           ||
-          (resource.data.status == 'in_progress'
-            && request.resource.data.status == 'resolved'
+          (
+            resource.data.status == 'IN_PROGRESS'
+            && request.resource.data.status == 'RESOLVED'
+            && request.resource.data.assignedTo == resource.data.assignedTo
+            && request.resource.data.acceptedAt == resource.data.acceptedAt
+            && request.resource.data.resolvedAt != null
             && request.resource.data.keys().hasOnly([
-              'type', 'room', 'note', 'status', 'createdAt', 'updatedAt', 'resolvedAt'
+              'type', 'room', 'note', 'status', 'createdAt', 'acceptedAt', 'resolvedAt', 'assignedTo', 'createdBy'
             ])
           )
         );
