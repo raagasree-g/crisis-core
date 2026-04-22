@@ -2,12 +2,9 @@ import { useMemo, useRef, useState } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "./firebase";
 
-const role = "user"; // ADDED: fallback demo role
-const simulatedUserId = "user_1";
-
-function SOS({ demoRole }) {
+function SOS({ role }) {
   const [type, setType] = useState("fire");
-  const [room, setRoom] = useState("");
+  const [roomInput, setRoomInput] = useState(localStorage.getItem("room") || "");
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
@@ -15,8 +12,10 @@ function SOS({ demoRole }) {
 
   const lastSubmitRef = useRef({ key: "", at: 0 });
 
-  const currentRole = demoRole || role; // ADDED: App-controlled role override
-  const isUser = useMemo(() => currentRole === "user", [currentRole]);
+  const isUser = useMemo(() => role === "user", [role]);
+  const userName = localStorage.getItem("userName") || "Guest";
+  const savedRoom = localStorage.getItem("room") || "";
+  const room = savedRoom || roomInput;
 
   const handleCreateAlert = async (event) => {
     event.preventDefault();
@@ -30,7 +29,7 @@ function SOS({ demoRole }) {
       return;
     }
 
-    const key = `${type}|${cleanRoom}|${cleanNote}`;
+    const key = `${type}|${cleanRoom}|${cleanNote}|${userName}`;
     const now = Date.now();
     if (lastSubmitRef.current.key === key && now - lastSubmitRef.current.at < 2500) {
       return;
@@ -45,18 +44,19 @@ function SOS({ demoRole }) {
         type,
         room: cleanRoom,
         note: cleanNote,
+        userName,
         status: "NEW",
         assignedTo: null,
         createdAt: serverTimestamp(),
         acceptedAt: null,
         resolvedAt: null,
-        createdBy: simulatedUserId,
       });
 
+      localStorage.setItem("room", cleanRoom);
       lastSubmitRef.current = { key, at: now };
       setMessage("SOS alert sent.");
       setType("fire");
-      setRoom("");
+      setRoomInput(cleanRoom);
       setNote("");
     } catch (err) {
       console.error("Failed to create alert", err);
@@ -67,7 +67,7 @@ function SOS({ demoRole }) {
   };
 
   if (!isUser) {
-    return <p style={{ padding: 8 }}>SOS panel is available only for role = "user".</p>;
+    return <p style={{ padding: 8 }}>Only users can create alerts.</p>;
   }
 
   return (
@@ -88,10 +88,10 @@ function SOS({ demoRole }) {
           Room
           <input
             value={room}
-            onChange={(e) => setRoom(e.target.value)}
+            onChange={(e) => setRoomInput(e.target.value)}
             placeholder="203"
             maxLength={10}
-            disabled={sending}
+            disabled={sending || Boolean(savedRoom)}
           />
         </label>
 
