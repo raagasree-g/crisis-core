@@ -17,11 +17,25 @@ const ORG_TYPES = [
   "Others",
 ];
 
+const countries = [
+  { name: "India", code: "+91" },
+  { name: "USA", code: "+1" },
+  { name: "UK", code: "+44" },
+  { name: "Australia", code: "+61" },
+  { name: "Canada", code: "+1" },
+  { name: "Germany", code: "+49" },
+  { name: "France", code: "+33" },
+  { name: "Japan", code: "+81" },
+  { name: "China", code: "+86" },
+];
+
 function Login({ setRole }) {
   const [userInfo, setUserInfo] = useState({
     name: localStorage.getItem("userName") || "",
-    phone: localStorage.getItem("phone") || "",
   });
+  const [countryCode, setCountryCode] = useState("+91");
+  const [phone, setPhone] = useState("");
+  const [phoneError, setPhoneError] = useState("");
   const [userInfoDone, setUserInfoDone] = useState(false);
 
   const [selectedOrgType, setSelectedOrgType] = useState(null);
@@ -52,17 +66,44 @@ function Login({ setRole }) {
     return "";
   };
 
+  function validatePhone() {
+    const normalized = phone.trim();
+
+    if (!normalized) {
+      setPhoneError("Phone number is required");
+      return false;
+    }
+
+    if (normalized.length < 8) {
+      setPhoneError("Phone number too short");
+      return false;
+    }
+
+    if (normalized.length > 15) {
+      setPhoneError("Phone number too long (max 15 digits)");
+      return false;
+    }
+
+    setPhoneError("");
+    return true;
+  }
+
   const handleContinueUserInfo = () => {
     const cleanName = userInfo.name.trim();
-    const cleanPhone = userInfo.phone.trim();
 
-    if (!cleanName || !cleanPhone) {
-      setError("Please enter name and phone number.");
+    if (!cleanName) {
+      setError("Please enter name.");
       return;
     }
 
+    if (!validatePhone()) {
+      return;
+    }
+
+    const fullPhone = `${countryCode}${phone.trim()}`;
+
     localStorage.setItem("userName", cleanName);
-    localStorage.setItem("phone", cleanPhone);
+    localStorage.setItem("phone", fullPhone);
     setUserInfoDone(true);
     setError("");
   };
@@ -156,12 +197,28 @@ function Login({ setRole }) {
             </label>
             <label style={{ display: "grid", gap: 6 }}>
               Phone Number
-              <input
-                value={userInfo.phone}
-                onChange={(e) => setUserInfo((prev) => ({ ...prev, phone: e.target.value }))}
-                placeholder="Enter phone number"
-              />
+              <div style={{ display: "grid", gridTemplateColumns: "170px 1fr", gap: 8 }}>
+                <select value={countryCode} onChange={(e) => setCountryCode(e.target.value)}>
+                  {countries.map((c, index) => (
+                    <option key={`${c.code}-${c.name}-${index}`} value={c.code}>
+                      {c.name} ({c.code})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  placeholder="Enter phone number"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value.replace(/\D/g, "").trim());
+                    if (phoneError) setPhoneError("");
+                  }}
+                />
+              </div>
             </label>
+            {phoneError && (
+              <p style={{ color: "red", margin: 0 }}>{phoneError}</p>
+            )}
             <button onClick={handleContinueUserInfo} style={{ padding: "10px 14px" }}>
               Continue
             </button>
