@@ -1,0 +1,157 @@
+.layout {
+  min-height: 100vh;
+  margin: 0 auto;
+  max-width: 1080px;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 18px;
+  background: linear-gradient(180deg, #f6f8fc 0%, #eef3ff 100%);
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #e4e9f3;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 8px 25px rgba(23, 43, 77, 0.08);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.subtitle {
+  margin-top: 6px;
+  margin-bottom: 14px;
+  color: #5f6f89;
+}
+
+.sos-form {
+  display: grid;
+  gap: 12px;
+}
+
+.sos-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: #243044;
+}
+
+.sos-form input,
+.sos-form textarea,
+.sos-form select {
+  width: 100%;
+  border: 1px solid #c8d3e4;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.sos-form button,
+.status-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  background: #d93025;
+  color: #fff;
+  cursor: pointer;
+}
+
+.sos-form button:disabled,
+.status-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.badge {
+  background: #e8f1ff;
+  color: #0a58ca;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.alert-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.alert-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e4e9f3;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafcff;
+}
+
+.title {
+  font-weight: 700;
+  margin-bottom: 3px;
+}
+
+.status {
+  font-size: 12px;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.status-new {
+  color: #c81e1e;
+}
+
+.status-in_progress {
+  color: #b26d00;
+}
+
+.status-resolved {
+  color: #117333;
+}
+
+.meta {
+  color: #5f6f89;
+  font-size: 12px;
+}
+
+.done {
+  align-self: center;
+  color: #117333;
+  font-weight: 700;
+}
+
+.error {
+  color: #c81e1e;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.muted {
+  color: #5f6f89;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+}
