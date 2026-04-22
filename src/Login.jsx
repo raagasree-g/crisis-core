@@ -19,10 +19,16 @@ const ORG_TYPES = [
 
 function Login({ setRole }) {
   const [selectedOrgType, setSelectedOrgType] = useState(null);
-  const [customOrg, setCustomOrg] = useState("");
   const [selectedRole, setSelectedRole] = useState(null);
 
-  const [orgChoice, setOrgChoice] = useState("");
+  const [orgDetails, setOrgDetails] = useState({
+    name: "",
+    location: "",
+    contact: "",
+    capacity: "",
+    extra: "",
+  });
+  const [showOrgDetails, setShowOrgDetails] = useState(false);
 
   const [userName, setUserName] = useState("");
   const [room, setRoom] = useState("");
@@ -31,21 +37,48 @@ function Login({ setRole }) {
   const [adminCode, setAdminCode] = useState("");
   const [error, setError] = useState("");
 
+  const getExtraLabel = () => {
+    if (selectedOrgType === "Hotel") return "Number of Floors";
+    if (selectedOrgType === "Hospital") return "Number of Departments";
+    if (selectedOrgType === "Event") return "Event Name";
+    if (selectedOrgType === "Others") return "Describe Organization";
+    return "";
+  };
+
   const handleContinueOrg = () => {
-    if (!orgChoice) {
+    if (!selectedOrgType) {
       setError("Please select organization type.");
       return;
     }
 
-    if (orgChoice === "Others" && !customOrg.trim()) {
-      setError("Please enter your organization name.");
+    setShowOrgDetails(true);
+    setError("");
+  };
+
+  const handleContinueOrgDetails = () => {
+    const details = {
+      name: orgDetails.name.trim(),
+      location: orgDetails.location.trim(),
+      contact: orgDetails.contact.trim(),
+      capacity: orgDetails.capacity.trim(),
+      extra: orgDetails.extra.trim(),
+    };
+
+    if (!details.name || !details.location || !details.contact || !details.capacity) {
+      setError("Please fill all required organization details.");
       return;
     }
 
-    const orgType = orgChoice === "Others" ? customOrg.trim() : orgChoice;
-    localStorage.setItem("organizationType", orgType);
+    localStorage.setItem("organizationType", selectedOrgType);
+    localStorage.setItem(
+      "organizationDetails",
+      JSON.stringify({
+        ...details,
+        organizationType: selectedOrgType,
+      }),
+    );
 
-    setSelectedOrgType(orgType);
+    setShowOrgDetails(false);
     setError("");
   };
 
@@ -101,37 +134,89 @@ function Login({ setRole }) {
                 <button
                   key={org}
                   onClick={() => {
-                    setOrgChoice(org);
+                    setSelectedOrgType(org);
                     setError("");
                   }}
                   style={{
                     padding: "10px 12px",
-                    border: orgChoice === org ? "2px solid #0a58ca" : "1px solid #d0d7e2",
+                    border: selectedOrgType === org ? "2px solid #0a58ca" : "1px solid #d0d7e2",
                   }}
                 >
                   {org}
                 </button>
               ))}
             </div>
-
-            {orgChoice === "Others" ? (
-              <label style={{ display: "grid", gap: 6, textAlign: "left" }}>
-                What is your organization?
-                <input
-                  value={customOrg}
-                  onChange={(e) => setCustomOrg(e.target.value)}
-                  placeholder="Enter organization name"
-                />
-              </label>
-            ) : null}
-
             <button onClick={handleContinueOrg} style={{ padding: "10px 14px" }}>
               Continue
             </button>
           </div>
         ) : null}
 
-        {selectedOrgType !== null && selectedRole === null ? (
+        {selectedOrgType !== null && showOrgDetails ? (
+          <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
+            <h2 style={{ margin: 0, textAlign: "center" }}>Enter Organization Details</h2>
+            <label style={{ display: "grid", gap: 6 }}>
+              Organization Name
+              <input
+                value={orgDetails.name}
+                onChange={(e) => setOrgDetails((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter organization name"
+              />
+            </label>
+            <label style={{ display: "grid", gap: 6 }}>
+              Location (City / Area)
+              <input
+                value={orgDetails.location}
+                onChange={(e) => setOrgDetails((prev) => ({ ...prev, location: e.target.value }))}
+                placeholder="Enter location"
+              />
+            </label>
+            <label style={{ display: "grid", gap: 6 }}>
+              Contact Number
+              <input
+                value={orgDetails.contact}
+                onChange={(e) => setOrgDetails((prev) => ({ ...prev, contact: e.target.value }))}
+                placeholder="Enter contact number"
+              />
+            </label>
+            <label style={{ display: "grid", gap: 6 }}>
+              Capacity (number of people)
+              <input
+                type="number"
+                value={orgDetails.capacity}
+                onChange={(e) => setOrgDetails((prev) => ({ ...prev, capacity: e.target.value }))}
+                placeholder="Enter capacity"
+              />
+            </label>
+
+            {getExtraLabel() ? (
+              <label style={{ display: "grid", gap: 6 }}>
+                {getExtraLabel()}
+                <input
+                  value={orgDetails.extra}
+                  onChange={(e) => setOrgDetails((prev) => ({ ...prev, extra: e.target.value }))}
+                  placeholder={`Enter ${getExtraLabel().toLowerCase()}`}
+                />
+              </label>
+            ) : null}
+
+            <button onClick={handleContinueOrgDetails} style={{ padding: "10px 14px" }}>
+              Continue
+            </button>
+            <button
+              onClick={() => {
+                setShowOrgDetails(false);
+                setSelectedOrgType(null);
+                setError("");
+              }}
+              style={{ padding: "10px 14px" }}
+            >
+              {"<- Back to Organization"}
+            </button>
+          </div>
+        ) : null}
+
+        {selectedOrgType !== null && !showOrgDetails && selectedRole === null ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
             <h2 style={{ margin: 0 }}>Select Your Role</h2>
             <button onClick={() => { setSelectedRole("user"); setError(""); }} style={{ padding: "10px 14px" }}>
@@ -145,18 +230,18 @@ function Login({ setRole }) {
             </button>
             <button
               onClick={() => {
-                setSelectedOrgType(null);
+                setShowOrgDetails(true);
                 setSelectedRole(null);
                 setError("");
               }}
               style={{ padding: "10px 14px" }}
             >
-              ? Back to Organization
+              {"<- Back to Organization"} Details
             </button>
           </div>
         ) : null}
 
-        {selectedOrgType !== null && selectedRole === "user" ? (
+        {selectedOrgType !== null && !showOrgDetails && selectedRole === "user" ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
             <h2 style={{ margin: 0, textAlign: "center" }}>User Login</h2>
             <label style={{ display: "grid", gap: 6 }}>
@@ -169,12 +254,12 @@ function Login({ setRole }) {
             </label>
             <button onClick={handleUserLogin} style={{ padding: "10px 14px" }}>Login as Guest</button>
             <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
-              ? Back to Role Selection
+              {"<- Back to Role Selection"}
             </button>
           </div>
         ) : null}
 
-        {selectedOrgType !== null && selectedRole === "responder" ? (
+        {selectedOrgType !== null && !showOrgDetails && selectedRole === "responder" ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
             <h2 style={{ margin: 0, textAlign: "center" }}>Responder Login</h2>
             <label style={{ display: "grid", gap: 6 }}>
@@ -190,12 +275,12 @@ function Login({ setRole }) {
             </label>
             <button onClick={handleResponderLogin} style={{ padding: "10px 14px" }}>Login as Responder</button>
             <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
-              ? Back to Role Selection
+              {"<- Back to Role Selection"}
             </button>
           </div>
         ) : null}
 
-        {selectedOrgType !== null && selectedRole === "admin" ? (
+        {selectedOrgType !== null && !showOrgDetails && selectedRole === "admin" ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
             <h2 style={{ margin: 0, textAlign: "center" }}>Admin Login</h2>
             <label style={{ display: "grid", gap: 6 }}>
@@ -209,7 +294,7 @@ function Login({ setRole }) {
             </label>
             <button onClick={handleAdminLogin} style={{ padding: "10px 14px" }}>Login as Admin</button>
             <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
-              ? Back to Role Selection
+              {"<- Back to Role Selection"}
             </button>
           </div>
         ) : null}
@@ -221,3 +306,5 @@ function Login({ setRole }) {
 }
 
 export default Login;
+
+
