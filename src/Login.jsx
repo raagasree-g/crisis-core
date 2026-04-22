@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 const ORG_TYPES = [
   "Hotel",
@@ -16,6 +17,8 @@ const ORG_TYPES = [
   "Airport",
   "Others",
 ];
+
+const auth = getAuth();
 
 function Login({ setRole }) {
   const [selectedOrgType, setSelectedOrgType] = useState(null);
@@ -35,7 +38,38 @@ function Login({ setRole }) {
   const [staffId, setStaffId] = useState("");
   const [department, setDepartment] = useState("Security");
   const [adminCode, setAdminCode] = useState("");
+
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+
   const [error, setError] = useState("");
+  const recaptchaReadyRef = useRef(false);
+
+  useEffect(() => {
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(
+        auth,
+        "recaptcha-container",
+        { size: "invisible" },
+      );
+    }
+
+    recaptchaReadyRef.current = true;
+
+    return () => {
+      recaptchaReadyRef.current = false;
+    };
+  }, []);
+
+  const resetPhoneVerificationState = () => {
+    setOtp("");
+    setOtpSent(false);
+    setIsPhoneVerified(false);
+  };
 
   const getExtraLabel = () => {
     if (selectedOrgType === "Hotel") return "Number of Floors";
@@ -43,6 +77,78 @@ function Login({ setRole }) {
     if (selectedOrgType === "Event") return "Event Name";
     if (selectedOrgType === "Others") return "Describe Organization";
     return "";
+  };
+
+  const normalizePhone = (rawPhone) => {
+    const trimmed = rawPhone.trim();
+    if (!trimmed) return "";
+
+    if (trimmed.startsWith("+")) return trimmed;
+    return `+${trimmed}`;
+  };
+
+  const sendOtp = async () => {
+    try {
+      const normalizedPhone = normalizePhone(phoneNumber);
+      if (!normalizedPhone || normalizedPhone.length < 8) {
+        setError("Enter a valid phone number with country code (example: +919876543210). ");
+        return;
+      }
+
+      if (!window.recaptchaVerifier || !recaptchaReadyRef.current) {
+        setError("reCAPTCHA not ready. Please wait and try again.");
+        return;
+      }
+
+      setSendingOtp(true);
+      setError("");
+
+      const confirmationResult = await signInWithPhoneNumber(
+        auth,
+        normalizedPhone,
+        window.recaptchaVerifier,
+      );
+
+      window.confirmationResult = confirmationResult;
+      setPhoneNumber(normalizedPhone);
+      setOtpSent(true);
+      setIsPhoneVerified(false);
+      alert("OTP sent!");
+    } catch (otpError) {
+      console.error("OTP send failed", otpError);
+      setError("Failed to send OTP. Check phone format and Firebase phone auth settings.");
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    try {
+      if (!window.confirmationResult) {
+        setError("Send OTP first.");
+        return;
+      }
+
+      if (!otp.trim()) {
+        setError("Enter OTP.");
+        return;
+      }
+
+      setVerifyingOtp(true);
+      setError("");
+
+      const result = await window.confirmationResult.confirm(otp.trim());
+      if (result.user) {
+        localStorage.setItem("phone", phoneNumber);
+        setIsPhoneVerified(true);
+        alert("Phone verified!");
+      }
+    } catch (verifyError) {
+      console.error("OTP verify failed", verifyError);
+      setError("Invalid OTP or verification failed.");
+    } finally {
+      setVerifyingOtp(false);
+    }
   };
 
   const handleOrgSelect = (orgType) => {
@@ -83,6 +189,11 @@ function Login({ setRole }) {
     const cleanName = userName.trim();
     const cleanRoom = room.trim();
 
+    if (!isPhoneVerified) {
+      setError("Verify phone with OTP before login.");
+      return;
+    }
+
     if (!cleanName || !cleanRoom) {
       setError("Please enter name and room number.");
       return;
@@ -97,6 +208,11 @@ function Login({ setRole }) {
   const handleResponderLogin = () => {
     const cleanStaffId = staffId.trim();
 
+    if (!isPhoneVerified) {
+      setError("Verify phone with OTP before login.");
+      return;
+    }
+
     if (!cleanStaffId || !department) {
       setError("Please enter Staff ID and department.");
       return;
@@ -109,6 +225,11 @@ function Login({ setRole }) {
   };
 
   const handleAdminLogin = () => {
+    if (!isPhoneVerified) {
+      setError("Verify phone with OTP before login.");
+      return;
+    }
+
     if (adminCode !== "1234") {
       setError("Invalid admin code.");
       return;
@@ -117,6 +238,51 @@ function Login({ setRole }) {
     localStorage.setItem("role", "admin");
     setRole("admin");
   };
+
+  const renderPhoneOtpSection = () => (
+    <div style={{ display: "grid", gap: 8 }}>
+      <label style={{ display: "grid", gap: 6 }}>
+        Phone Number
+        <input
+          value={phoneNumber}
+          onChange={(e) => {
+            setPhoneNumber(e.target.value);
+            setIsPhoneVerified(false);
+          }}
+          placeholder="+919876543210"
+          disabled={sendingOtp || verifyingOtp || isPhoneVerified}
+        />
+      </label>
+
+      <button
+        onClick={sendOtp}
+        disabled={sendingOtp || verifyingOtp || isPhoneVerified}
+        style={{ padding: "10px 14px" }}
+      >
+        {sendingOtp ? "Sending OTP..." : isPhoneVerified ? "OTP Verified" : "Send OTP"}
+      </button>
+
+      {otpSent && !isPhoneVerified ? (
+        <>
+          <label style={{ display: "grid", gap: 6 }}>
+            OTP
+            <input
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              placeholder="Enter OTP"
+              disabled={verifyingOtp}
+            />
+          </label>
+
+          <button onClick={verifyOtp} disabled={verifyingOtp} style={{ padding: "10px 14px" }}>
+            {verifyingOtp ? "Verifying..." : "Verify OTP"}
+          </button>
+        </>
+      ) : null}
+
+      <div id="recaptcha-container" />
+    </div>
+  );
 
   return (
     <main className="layout" style={{ gridTemplateColumns: "1fr", maxWidth: 560, placeItems: "center" }}>
@@ -199,6 +365,7 @@ function Login({ setRole }) {
                 setSelectedOrgType(null);
                 setShowOrgDetails(false);
                 setSelectedRole(null);
+                resetPhoneVerificationState();
                 setError("");
               }}
               style={{ padding: "10px 14px" }}
@@ -210,19 +377,41 @@ function Login({ setRole }) {
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
             <p>Step: Role</p>
             <h2 style={{ margin: 0 }}>Select Your Role</h2>
-            <button onClick={() => { setSelectedRole("user"); setError(""); }} style={{ padding: "10px 14px" }}>
+            <button
+              onClick={() => {
+                setSelectedRole("user");
+                resetPhoneVerificationState();
+                setError("");
+              }}
+              style={{ padding: "10px 14px" }}
+            >
               Login as User
             </button>
-            <button onClick={() => { setSelectedRole("responder"); setError(""); }} style={{ padding: "10px 14px" }}>
+            <button
+              onClick={() => {
+                setSelectedRole("responder");
+                resetPhoneVerificationState();
+                setError("");
+              }}
+              style={{ padding: "10px 14px" }}
+            >
               Login as Responder
             </button>
-            <button onClick={() => { setSelectedRole("admin"); setError(""); }} style={{ padding: "10px 14px" }}>
+            <button
+              onClick={() => {
+                setSelectedRole("admin");
+                resetPhoneVerificationState();
+                setError("");
+              }}
+              style={{ padding: "10px 14px" }}
+            >
               Login as Admin
             </button>
             <button
               onClick={() => {
                 setShowOrgDetails(false);
                 setSelectedRole(null);
+                resetPhoneVerificationState();
                 setError("");
               }}
               style={{ padding: "10px 14px" }}
@@ -243,8 +432,20 @@ function Login({ setRole }) {
                   Room Number
                   <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="203" />
                 </label>
-                <button onClick={handleUserLogin} style={{ padding: "10px 14px" }}>Login as Guest</button>
-                <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
+
+                {renderPhoneOtpSection()}
+
+                <button onClick={handleUserLogin} style={{ padding: "10px 14px" }}>
+                  Login as Guest
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedRole(null);
+                    resetPhoneVerificationState();
+                    setError("");
+                  }}
+                  style={{ padding: "10px 14px" }}
+                >
                   {"<- Back to Role Selection"}
                 </button>
               </div>
@@ -264,8 +465,20 @@ function Login({ setRole }) {
                     <option value="Medical">Medical</option>
                   </select>
                 </label>
-                <button onClick={handleResponderLogin} style={{ padding: "10px 14px" }}>Login as Responder</button>
-                <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
+
+                {renderPhoneOtpSection()}
+
+                <button onClick={handleResponderLogin} style={{ padding: "10px 14px" }}>
+                  Login as Responder
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedRole(null);
+                    resetPhoneVerificationState();
+                    setError("");
+                  }}
+                  style={{ padding: "10px 14px" }}
+                >
                   {"<- Back to Role Selection"}
                 </button>
               </div>
@@ -283,8 +496,20 @@ function Login({ setRole }) {
                     placeholder="Enter code"
                   />
                 </label>
-                <button onClick={handleAdminLogin} style={{ padding: "10px 14px" }}>Login as Admin</button>
-                <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
+
+                {renderPhoneOtpSection()}
+
+                <button onClick={handleAdminLogin} style={{ padding: "10px 14px" }}>
+                  Login as Admin
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedRole(null);
+                    resetPhoneVerificationState();
+                    setError("");
+                  }}
+                  style={{ padding: "10px 14px" }}
+                >
                   {"<- Back to Role Selection"}
                 </button>
               </div>
