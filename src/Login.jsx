@@ -1,7 +1,29 @@
 import { useState } from "react";
 
+const ORG_TYPES = [
+  "Hotel",
+  "School",
+  "College",
+  "University",
+  "Hospital",
+  "Apartment",
+  "Office",
+  "Event",
+  "Exhibition",
+  "Mall",
+  "Resort",
+  "Stadium",
+  "Airport",
+  "Others",
+];
+
 function Login({ setRole }) {
+  const [selectedOrgType, setSelectedOrgType] = useState(null);
+  const [customOrg, setCustomOrg] = useState("");
   const [selectedRole, setSelectedRole] = useState(null);
+
+  const [orgChoice, setOrgChoice] = useState("");
+
   const [userName, setUserName] = useState("");
   const [room, setRoom] = useState("");
   const [staffId, setStaffId] = useState("");
@@ -9,8 +31,21 @@ function Login({ setRole }) {
   const [adminCode, setAdminCode] = useState("");
   const [error, setError] = useState("");
 
-  const goBack = () => {
-    setSelectedRole(null);
+  const handleContinueOrg = () => {
+    if (!orgChoice) {
+      setError("Please select organization type.");
+      return;
+    }
+
+    if (orgChoice === "Others" && !customOrg.trim()) {
+      setError("Please enter your organization name.");
+      return;
+    }
+
+    const orgType = orgChoice === "Others" ? customOrg.trim() : orgChoice;
+    localStorage.setItem("organizationType", orgType);
+
+    setSelectedOrgType(orgType);
     setError("");
   };
 
@@ -54,26 +89,74 @@ function Login({ setRole }) {
   };
 
   return (
-    <main className="layout" style={{ gridTemplateColumns: "1fr", maxWidth: 520, placeItems: "center" }}>
-      <section className="card" style={{ width: "100%", maxWidth: 460, textAlign: "center" }}>
+    <main className="layout" style={{ gridTemplateColumns: "1fr", maxWidth: 560, placeItems: "center" }}>
+      <section className="card" style={{ width: "100%", maxWidth: 500, textAlign: "center" }}>
         <h1 style={{ marginTop: 0 }}>Crisis Core Login</h1>
 
-        {selectedRole === null ? (
+        {selectedOrgType === null ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
-            <h2 style={{ margin: 0 }}>Who are you?</h2>
-            <button onClick={() => setSelectedRole("user")} style={{ padding: "10px 14px" }}>
-              Login as User
-            </button>
-            <button onClick={() => setSelectedRole("responder")} style={{ padding: "10px 14px" }}>
-              Login as Responder
-            </button>
-            <button onClick={() => setSelectedRole("admin")} style={{ padding: "10px 14px" }}>
-              Login as Admin
+            <h2 style={{ margin: 0 }}>Select Organization Type</h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+              {ORG_TYPES.map((org) => (
+                <button
+                  key={org}
+                  onClick={() => {
+                    setOrgChoice(org);
+                    setError("");
+                  }}
+                  style={{
+                    padding: "10px 12px",
+                    border: orgChoice === org ? "2px solid #0a58ca" : "1px solid #d0d7e2",
+                  }}
+                >
+                  {org}
+                </button>
+              ))}
+            </div>
+
+            {orgChoice === "Others" ? (
+              <label style={{ display: "grid", gap: 6, textAlign: "left" }}>
+                What is your organization?
+                <input
+                  value={customOrg}
+                  onChange={(e) => setCustomOrg(e.target.value)}
+                  placeholder="Enter organization name"
+                />
+              </label>
+            ) : null}
+
+            <button onClick={handleContinueOrg} style={{ padding: "10px 14px" }}>
+              Continue
             </button>
           </div>
         ) : null}
 
-        {selectedRole === "user" ? (
+        {selectedOrgType !== null && selectedRole === null ? (
+          <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            <h2 style={{ margin: 0 }}>Select Your Role</h2>
+            <button onClick={() => { setSelectedRole("user"); setError(""); }} style={{ padding: "10px 14px" }}>
+              Login as User
+            </button>
+            <button onClick={() => { setSelectedRole("responder"); setError(""); }} style={{ padding: "10px 14px" }}>
+              Login as Responder
+            </button>
+            <button onClick={() => { setSelectedRole("admin"); setError(""); }} style={{ padding: "10px 14px" }}>
+              Login as Admin
+            </button>
+            <button
+              onClick={() => {
+                setSelectedOrgType(null);
+                setSelectedRole(null);
+                setError("");
+              }}
+              style={{ padding: "10px 14px" }}
+            >
+              ? Back to Organization
+            </button>
+          </div>
+        ) : null}
+
+        {selectedOrgType !== null && selectedRole === "user" ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
             <h2 style={{ margin: 0, textAlign: "center" }}>User Login</h2>
             <label style={{ display: "grid", gap: 6 }}>
@@ -84,16 +167,14 @@ function Login({ setRole }) {
               Room Number
               <input value={room} onChange={(e) => setRoom(e.target.value)} placeholder="203" />
             </label>
-            <button onClick={handleUserLogin} style={{ padding: "10px 14px" }}>
-              Login as Guest
-            </button>
-            <button onClick={goBack} style={{ padding: "10px 14px" }}>
-              ? Change Role
+            <button onClick={handleUserLogin} style={{ padding: "10px 14px" }}>Login as Guest</button>
+            <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
+              ? Back to Role Selection
             </button>
           </div>
         ) : null}
 
-        {selectedRole === "responder" ? (
+        {selectedOrgType !== null && selectedRole === "responder" ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
             <h2 style={{ margin: 0, textAlign: "center" }}>Responder Login</h2>
             <label style={{ display: "grid", gap: 6 }}>
@@ -107,16 +188,14 @@ function Login({ setRole }) {
                 <option value="Medical">Medical</option>
               </select>
             </label>
-            <button onClick={handleResponderLogin} style={{ padding: "10px 14px" }}>
-              Login as Responder
-            </button>
-            <button onClick={goBack} style={{ padding: "10px 14px" }}>
-              ? Change Role
+            <button onClick={handleResponderLogin} style={{ padding: "10px 14px" }}>Login as Responder</button>
+            <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
+              ? Back to Role Selection
             </button>
           </div>
         ) : null}
 
-        {selectedRole === "admin" ? (
+        {selectedOrgType !== null && selectedRole === "admin" ? (
           <div style={{ display: "grid", gap: 10, marginTop: 12, textAlign: "left" }}>
             <h2 style={{ margin: 0, textAlign: "center" }}>Admin Login</h2>
             <label style={{ display: "grid", gap: 6 }}>
@@ -128,11 +207,9 @@ function Login({ setRole }) {
                 placeholder="Enter code"
               />
             </label>
-            <button onClick={handleAdminLogin} style={{ padding: "10px 14px" }}>
-              Login as Admin
-            </button>
-            <button onClick={goBack} style={{ padding: "10px 14px" }}>
-              ? Change Role
+            <button onClick={handleAdminLogin} style={{ padding: "10px 14px" }}>Login as Admin</button>
+            <button onClick={() => { setSelectedRole(null); setError(""); }} style={{ padding: "10px 14px" }}>
+              ? Back to Role Selection
             </button>
           </div>
         ) : null}
